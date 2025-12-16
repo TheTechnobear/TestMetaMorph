@@ -1,5 +1,7 @@
-this is the directory for the desktop vcv module build
-you can create a link to this directly from your vcv plugins directory to run yur plugins for testing.
+currently this plugin is just a copy of github.com/EraeMorph which was my origial plugin test
+you can find this in external as reference, but Im just copying the vcv code 
+EraeTouchLite submodule is still separate and will remain so.
 
-
-in my dev setup, this is a separate github repo, but for simplicity Ive made it a simple dirctory
+I'll probably remove EraeMorph as was only a conceptual test, so could remain in this repo, 
+until its ready for a proper release.
+question is, will it be part of MetaMorph as most of that is not really applicable to MetaModule.

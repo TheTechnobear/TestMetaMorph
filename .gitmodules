@@ -1,3 +1,9 @@
 [submodule "metamodule-plugin-sdk"]
 	path = metamodule-plugin-sdk
 	url = https://github.com/4ms/metamodule-plugin-sdk.git
+[submodule "VcvModules/extern/EraeMorph"]
+	path = VcvModules/extern/EraeMorph
+	url = https://github.com/TheTechnobear/EraeMorph
+[submodule "VcvModules/extern/EraeTouchLite"]
+	path = VcvModules/extern/EraeTouchLite
+	url = https://github.com/TheTechnobear/EraeTouchLite.git

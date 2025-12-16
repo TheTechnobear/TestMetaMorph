@@ -1,0 +1,15 @@
+{
+  "MetaModuleBrandName": "TB Test Modules",
+  "MetaModuleBrandSlug": "TBTest",
+  "MetaModulePluginMaintainer": "TheTechnobear",
+  "MetaModulePluginMaintainerEmail": "mharris@technobear.com",
+  "MetaModulePluginMaintainerUrl": "github.com/TheTechnobear",
+  "MetaModuleDescription": "modules for testing only",
+  "MetaModuleIncludedModules": [
+    {
+      "slug": "EraeTouch",
+      "name": "EraeTouch",
+      "displayName": "interface to erae touch"
+    }
+  ]
+}

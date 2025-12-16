@@ -1,0 +1,26 @@
+{
+  "slug": "TBTest",
+  "name": "TB Test Modules",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "description": "modules for testing only",
+  "brand": "TheTechnobear",
+  "author": "TheTechnobear",
+  "authorEmail": "mharris@technobear.com",
+  "authorUrl": "github.com/TheTechnobear",
+  "pluginUrl": "github.com/TheTechnobear",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "EraeTouch",
+      "name": "EraeTouch",
+      "description": "interface to erae touch",
+      "tags": [
+        "device"
+      ]
+    }
+  ]
+}
