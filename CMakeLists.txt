@@ -27,13 +27,11 @@ set(EXTERN_DIR ${CMAKE_CURRENT_LIST_DIR}/VcvModules/extern)
 set(ET_DIR ${EXTERN_DIR}/EraeTouchLite)
 
 set(ETL_DIR ${ET_DIR}/erae-api)
-set(MOODYCAM ${ET_DIR}/external/moodycamel)
 
 
 target_include_directories(VcvMetaModules PRIVATE
     ${SOURCE_DIR}/src
     ${SOURCE_DIR}/inc/rnbo-export/common
-    ${MOODYCAM}
     ${ETL_DIR} 
 )
 
