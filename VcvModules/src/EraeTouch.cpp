@@ -84,10 +84,7 @@ struct EraeTouch : Module {
         }
     }
 
-    void processMidi(const midi::Message& msg) {
-
-    }
-
+    void processMidi(const midi::Message& msg);
 
 
     class ApiCallback;
@@ -195,6 +192,21 @@ struct EraeTouch : Module {
         EraeTouch* module_ = nullptr;
     };
 };
+
+#ifdef METAMODULE 
+void EraeTouch::processMidi(const midi::Message& msg) {
+
+}
+#else 
+void EraeTouch::processMidi(const midi::Message& midimsg) {
+    // nop, as we use own midi stack, not vcv
+    unsigned char bytemsg[3] = {0,0,0};
+    for(int i=0;i<midimsg.getSize();i++) { bytemsg[i]=midimsg.bytes[i];}
+    EraeApi::MidiMsg msg(bytemsg, 3);
+    device_->queueInMsg(msg);
+}
+#endif
+
 
 
 struct EraeTouchWidget : ModuleWidget {

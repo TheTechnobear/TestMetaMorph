@@ -39,6 +39,7 @@ target_sources(VcvMetaModules
     PRIVATE
     ${SOURCE_DIR}/src/plugin.cpp
     ${SOURCE_DIR}/src/EraeTouch.cpp
+    ${SOURCE_DIR}/src/MMMidiDevice.cpp
     ${ETL_DIR}/EraeApi.cpp
     ${ETL_DIR}/MidiDevice.cpp
 )
