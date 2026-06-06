@@ -54,7 +54,7 @@ endif
 ETL_SRC = \
     ${ETL_DIR}/EraeApi.cpp\
     ${ETL_DIR}/MidiDevice.cpp\
-    ${ETL_DIR}/RtMidiDevice.cpp\
+#     ${ETL_DIR}/RtMidiDevice.cpp\
 
 RTMIDI_SRC = \
     ${RTMIDI_DIR}/RtMidi.cpp
@@ -69,6 +69,7 @@ SOURCES += ${RTMIDI_SRC}
 SOURCES += \
 src/plugin.cpp \
 src/EraeTouch.cpp \
+src/VcvMidiDevice.cpp \
 
 
 # Add files to the ZIP package when running `make dist`

@@ -1,22 +1,28 @@
 #include <EraeApi.h>
 
+#include <iostream>
 #include <memory>
-// #include <iostream>
-// #define LOG_0(x) std::cerr << "ETL : " << x << std::endl;
-#define LOG_0(x) 
+
+#define LOG_0(x)
+
+#include "plugin.hpp"
 
 #ifdef METAMODULE
 #include "MMMidiDevice.h"
 #else
-#include <RtMidiDevice.h>
-#endif 
+#include "VcvMidiDevice.h"
+// #include <RtMidiDevice.h>
+#include <stdio.h>
+#endif
 
-#include "plugin.hpp"
+
 struct EraeTouch : Module {
     enum ParamId { PARAMS_LEN };
     enum InputId { IN_STREAM_INPUT, INPUTS_LEN };
     enum OutputId { OUT_STREAM_OUTPUT, OUT_X_OUTPUT, OUT_Y_OUTPUT, OUT_Z_OUTPUT, OUT_TOUCH_OUTPUT, OUTPUTS_LEN };
     enum LightId { LED_S1_LIGHT, LIGHTS_LEN };
+    enum DisplayId { TEXT_DISPLAY = LIGHTS_LEN };
+
 
     EraeTouch() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -29,9 +35,54 @@ struct EraeTouch : Module {
 
         if (api_ == nullptr) {
 #ifdef METAMODULE
+            // midiInput.setDriverId(midiInput.getDefaultDriverId());
+            midiInput.setDeviceId(midiInput.getDefaultDeviceId());
+            midiInput.setChannel(-1);
             device_ = std::make_shared<MMMidiDevice>();
 #else
-            device_ = std::make_shared<EraeApi::RtMidiDevice>();
+            int coreMidiId = -1;          // 1 = coremidi on my system
+            int eraeInputDeviceId = -1;   // 2 on mine
+            int eraeOutputDeviceId = -1;  // 2 on mine
+            std::vector<int> driverIds = rack::midi::getDriverIds();
+            for (int id : driverIds) {
+                auto* driver = rack::midi::getDriver(id);
+                std::string name = driver->getName();
+
+                // printf("Driver %d = %s\n", id, name.c_str());
+                if (name == "Core MIDI") coreMidiId = id;  // 1 for me
+            }
+            if (coreMidiId >= 0) {
+                auto* driver = rack::midi::getDriver(coreMidiId);
+                std::vector<int> indevices = driver->getInputDeviceIds();
+                for (int dev : indevices) {
+                    std::string name = driver->getInputDeviceName(dev);
+                    // printf("In Device %d = %s\n", dev, name.c_str());
+                    if (name == "Erae 2 MIDI") eraeInputDeviceId = dev;  // 2 for me
+                }
+
+                std::vector<int> outdevices = driver->getOutputDeviceIds();
+                for (int dev : outdevices) {
+                    std::string name = driver->getOutputDeviceName(dev);
+                    // printf("Out Device %d = %s\n", dev, name.c_str());
+                    if (name == "Erae 2 MIDI") eraeOutputDeviceId = dev;  // 2 for me
+                }
+
+                if (eraeInputDeviceId >= 0) {
+                    printf("Found Erae Input\n");
+                    midiInput.setDriverId(coreMidiId);
+                    midiInput.setDeviceId(eraeInputDeviceId);
+                    midiInput.setChannel(-1);  // all channels
+                }
+                if (eraeOutputDeviceId >= 0) {
+                    printf("Found Erae Output\n");
+                    midiOutput.setDriverId(coreMidiId);
+                    midiOutput.setDeviceId(eraeOutputDeviceId);
+                }
+            }
+
+
+            // device_ = std::make_shared<EraeApi::RtMidiDevice>();
+            device_ = std::make_shared<VcvMidiDevice>();
 #endif
             api_ = new EraeApi::EraeApi(device_, "Erae 2 MIDI");
             // api_ = new EraeApi::EraeApi("Erae Touch MIDI");
@@ -65,9 +116,12 @@ struct EraeTouch : Module {
 
     void process(const ProcessArgs& args) override {
         midi::Message msg;
-        while (midiInput.tryPop(&msg, args.frame)) { processMidi(msg); }        
+        while (midiInput.tryPop(&msg, args.frame)) { processMidi(msg); }
 
         if (api_ != nullptr) { api_->process(); }
+#ifdef METAMODULE
+        if (device_->debugState()) ledCounter_ = 96000;
+#endif
 
         outputs[OUT_X_OUTPUT].setChannels(MAX_TOUCH);
         outputs[OUT_Y_OUTPUT].setChannels(MAX_TOUCH);
@@ -82,6 +136,8 @@ struct EraeTouch : Module {
             outputs[OUT_Z_OUTPUT].setVoltage(touchinfo.z_, i);
             outputs[OUT_TOUCH_OUTPUT].setVoltage(touchinfo.touch_, i);
         }
+        lights[LED_S1_LIGHT].setBrightness(ledCounter_ > 0 ? 1.0f : 0.0f);
+        ledCounter_ -= ledCounter_ > 0;
     }
 
     void processMidi(const midi::Message& msg);
@@ -91,9 +147,16 @@ struct EraeTouch : Module {
     friend class ApiCallback;
     std::shared_ptr<ApiCallback> callback_;
     EraeApi::EraeApi* api_ = nullptr;
+    int ledCounter_ = 0;
     midi::InputQueue midiInput;
+    midi::Output midiOutput;
 
-    std::shared_ptr<EraeApi::MidiDevice> device_;
+#ifdef METAMODULE
+    std::shared_ptr<MMMidiDevice> device_;
+#else
+    std::shared_ptr<VcvMidiDevice> device_;
+    // std::shared_ptr<EraeApi::RtMidiDevice> device_;
+#endif
 
     struct Touch {
         float x_ = 0.0f;
@@ -124,6 +187,7 @@ struct EraeTouch : Module {
 
         // api
         void onStartTouch(unsigned zone, unsigned finger, float x, float y, float z) override {
+            // module_->ledCounter_=96000;
             unsigned touch = finger % MAX_TOUCH;
             // LOG_0("onStartTouch zone: " << zone << " touch " << touch << " " << x << " , " << y << " , " << z);
             if (zone < MAX_ZONE) {
@@ -191,22 +255,33 @@ struct EraeTouch : Module {
 
         EraeTouch* module_ = nullptr;
     };
+
+#ifdef METAMODULE
+    size_t get_display_text(int display_id, std::span<char> text) override {
+        if (display_id == TEXT_DISPLAY) {
+            std::string someText = device_->debugString();
+            std::string formatted;
+            for (size_t i = 0; i < someText.size(); ++i) {
+                if (i > 0 && i % 16 == 0) formatted += '\n';
+                formatted += someText[i];
+            }
+
+            size_t chars_to_copy = std::min(formatted.size(), text.size());
+            std::copy(formatted.data(), formatted.data() + chars_to_copy, text.begin());
+            return chars_to_copy;
+        }
+        return 0;
+    }
+#endif
 };
 
-#ifdef METAMODULE 
-void EraeTouch::processMidi(const midi::Message& msg) {
-
-}
-#else 
 void EraeTouch::processMidi(const midi::Message& midimsg) {
-    // nop, as we use own midi stack, not vcv
-    unsigned char bytemsg[3] = {0,0,0};
-    for(int i=0;i<midimsg.getSize();i++) { bytemsg[i]=midimsg.bytes[i];}
-    EraeApi::MidiMsg msg(bytemsg, 3);
-    device_->queueInMsg(msg);
-}
+#ifdef METAMODULE
+    device_->onMessage(midimsg);
+#else
+    device_->onMessage(midimsg);
 #endif
-
+}
 
 
 struct EraeTouchWidget : ModuleWidget {
@@ -229,6 +304,15 @@ struct EraeTouchWidget : ModuleWidget {
 
         addChild(
             createLightCentered<MediumLight<RedLight>>(mm2px(Vec(30.284, 21.476)), module, EraeTouch::LED_S1_LIGHT));
+
+#ifdef METAMODULE
+        auto display = createWidget<MetaModule::VCVTextDisplay>(mm2px(Vec(4, 40)));
+        display->box.size = mm2px(Vec(50, 100));
+        display->firstLightId = EraeTouch::TEXT_DISPLAY;
+        display->font = "Default_10";
+        display->color = Colors565::Green;
+        addChild(display);
+#endif
     }
 };
 

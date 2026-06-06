@@ -4,5 +4,5 @@
 
 using namespace rack;
 
-extern Plugin* pluginInstance;
-extern Model* modelEraeTouch;
+extern plugin::Plugin* pluginInstance;
+extern plugin::Model* modelEraeTouch;
