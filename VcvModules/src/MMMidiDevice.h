@@ -20,11 +20,6 @@ public:
     void onMessage(rack::midi::Message msg);
     void onMessage(EraeApi::MidiMsg &msg);
 
-
-    bool debugState() { return debugState_;}
-    std::string debugString() { return debugString_;}
-
-
 protected:
     bool queueInMsg(const EraeApi::MidiMsg &msg) override;
     bool queueOutMsg(const EraeApi::MidiMsg &msg) override;
@@ -35,10 +30,6 @@ protected:
     bool send(const EraeApi::MidiMsg &msg) override;
 
     bool buildSysExMsg(EraeApi::MidiMsg &msg);
-
-
-    bool debugState_ = false ;
-    std::string debugString_;
 
     rack::midi::Output midiOutput_;
     bool sysExActive_ = false;

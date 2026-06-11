@@ -55,7 +55,6 @@ void MMMidiDevice::deinit() {
     ;
 }
 void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
-    static const size_t MAX_DEBUG_LEN = 64;
     unsigned cin = midimsg.getUsbCIN();
     switch (cin) {
         case 0: {
@@ -66,25 +65,20 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
                 sysExActive_ = false;
                 sysExIn_.clear();
             }
-            // Real-time messages (0xF8-0xFF) or any message during active sysex: ignore/drop
             break;
         }
         case 4: {
             bool startSysEx = midimsg.bytes[0] == 0xF0;
             if (startSysEx) {
-                debugState_ = true;
-                debugString_ += "S4";
                 sysExActive_ = true;
                 sysExIn_.clear();
                 sysExIn_.push_back(midimsg.bytes[1]);
                 sysExIn_.push_back(midimsg.bytes[2]);
             } else if (sysExActive_) {
-                debugString_ += ".";
                 sysExIn_.push_back(midimsg.bytes[0]);
                 sysExIn_.push_back(midimsg.bytes[1]);
                 sysExIn_.push_back(midimsg.bytes[2]);
             } else {
-                debugString_ += "?";
                 EraeApi::MidiMsg msgRecd =
                     EraeApi::MidiMsg::create(midimsg.bytes[0], midimsg.bytes[1], midimsg.bytes[2]);
                 onMessage(msgRecd);
@@ -94,16 +88,12 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
         case 5: {
             bool endSysEx = midimsg.bytes[0] == 0xF7;
             if (endSysEx && sysExActive_) {
-                debugString_ += "E5";
-                debugString_ += std::to_string(sysExIn_.size());
                 EraeApi::MidiMsg msgRecd;
                 buildSysExMsg(msgRecd);
                 onMessage(msgRecd);
-                debugString_ += "X";
                 sysExActive_ = false;
                 sysExIn_.clear();
             } else if (sysExActive_) {
-                debugString_ += "c5";
                 sysExIn_.push_back(midimsg.bytes[0]);
             } else {
                 EraeApi::MidiMsg msgRecd = EraeApi::MidiMsg::create(midimsg.bytes[0]);
@@ -115,34 +105,26 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
             bool startSysEx = midimsg.bytes[0] == 0xF0;
             bool endSysEx = midimsg.bytes[1] == 0xF7;
             if (startSysEx && endSysEx) {
-                debugString_ += "SE6X";
                 EraeApi::MidiMsg msgRecd;
                 buildSysExMsg(msgRecd);
                 onMessage(msgRecd);
                 sysExActive_ = false;
                 sysExIn_.clear();
             } else if (startSysEx) {
-                debugState_ = true;
-                debugString_ += "S6";
                 sysExActive_ = true;
                 sysExIn_.clear();
                 sysExIn_.push_back(midimsg.bytes[1]);
             } else if (sysExActive_ && endSysEx) {
-                debugString_ += "E6";
                 sysExIn_.push_back(midimsg.bytes[0]);
-                debugString_ += std::to_string(sysExIn_.size());
                 EraeApi::MidiMsg msgRecd;
                 buildSysExMsg(msgRecd);
                 onMessage(msgRecd);
-                debugString_ += "X";
                 sysExActive_ = false;
                 sysExIn_.clear();
             } else if (sysExActive_) {
-                debugString_ += "c6";
                 sysExIn_.push_back(midimsg.bytes[0]);
                 sysExIn_.push_back(midimsg.bytes[1]);
             } else if (endSysEx) {
-                debugString_ += "e6X";
                 sysExIn_.push_back(midimsg.bytes[0]);
                 EraeApi::MidiMsg msgRecd;
                 buildSysExMsg(msgRecd);
@@ -159,19 +141,15 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
             bool startSysEx = midimsg.bytes[0] == 0xF0;
             bool endSysEx = midimsg.bytes[2] == 0xF7;
             if (startSysEx && endSysEx) {
-                debugString_ += "SE7X";
                 EraeApi::MidiMsg msgRecd =
                     EraeApi::MidiMsg::create(midimsg.bytes[0], midimsg.bytes[1], midimsg.bytes[2]);
                 onMessage(msgRecd);
             } else if (startSysEx) {
-                debugState_ = true;
-                debugString_ += "S7";
                 sysExActive_ = true;
                 sysExIn_.clear();
                 sysExIn_.push_back(midimsg.bytes[1]);
                 sysExIn_.push_back(midimsg.bytes[2]);
             } else if (sysExActive_ && endSysEx) {
-                debugString_ += "E7X";
                 sysExIn_.push_back(midimsg.bytes[0]);
                 sysExIn_.push_back(midimsg.bytes[1]);
                 EraeApi::MidiMsg msgRecd;
@@ -180,7 +158,6 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
                 sysExActive_ = false;
                 sysExIn_.clear();
             } else if (sysExActive_) {
-                debugString_ += "c7";
                 sysExIn_.push_back(midimsg.bytes[0]);
                 sysExIn_.push_back(midimsg.bytes[1]);
                 sysExIn_.push_back(midimsg.bytes[2]);
@@ -191,9 +168,6 @@ void MMMidiDevice::onMessage(rack::midi::Message midimsg) {
             }
             break;
         }
-    }
-    if (debugString_.size() > MAX_DEBUG_LEN) {
-        debugString_ = debugString_.substr(debugString_.size() - MAX_DEBUG_LEN);
     }
 }
 
@@ -218,7 +192,6 @@ bool MMMidiDevice::buildSysExMsg(EraeApi::MidiMsg& msg) {
 // Note: we cannot use QMidiDevice as moodycamel does not support platform
 bool MMMidiDevice::queueInMsg(const EraeApi::MidiMsg& msg) {
     if (inputQueue_.full()) return false;
-    // debugString_ = logData(msg.data(), msg.size());
     inputQueue_.push(msg);
     return true;
 }
@@ -237,16 +210,11 @@ bool MMMidiDevice::nextInMsg(EraeApi::MidiMsg& msg) {
     // which it then will send to the callback handler, and interpret accordingly
     if (inputQueue_.empty()) return false;
     msg = inputQueue_.shift();
-    if (msg.size() == 32) {
-        if (msg.byte(0) == 0xF0 && msg.byte(31) == 0xF7) { debugState_ = false; }
-    }
     return true;
 }
 
 
 bool MMMidiDevice::nextOutMsg(EraeApi::MidiMsg& msg) {
-    // called by eraeApi::process()->MidiDevice::processOut to get next output message
-    // which it'll then use for send...
     if (outputQueue_.empty()) return false;
     msg = outputQueue_.shift();
     return true;
@@ -271,28 +239,25 @@ bool MMMidiDevice::send(const EraeApi::MidiMsg& msg) {
             if (msg.size() >= 2) {
                 int payloadSz = msg.size() - 2;
                 if (payloadSz == 0) {
-                    debugString_ += ">z";
                     rack::midi::Message midimsg;
                     midimsg.sysExNoPayload();
                     midiOutput_.sendMessage(midimsg);
                 } else if (payloadSz == 1) {
-                    debugString_ += ">";
-                    debugString_ += std::to_string(msg.byte(1) & 0xFF);
                     rack::midi::Message midimsg;
                     midimsg.sysExSingleByte(msg.byte(1));
                     midiOutput_.sendMessage(midimsg);
                 } else {
                     // multibyte - filter to only allow API version request (byte 11 == 0x01)
-                    unsigned msgType = (msg.size() > 11) ? msg.byte(11) : 0;
-                    debugString_ += ">[4";
+                    // unsigned msgType = (msg.size() > 11) ? msg.byte(11) : 0;
+                    // if(msgType != 0x01) return true;
+
                     rack::midi::Message midimsg;
                     unsigned offset = 1;
                     midimsg.startSysEx(msg.byte(offset), msg.byte(offset + 1));
                     midiOutput_.sendMessage(midimsg);
                     offset += 2;
                     // we need 3 bytes, and the sysex end
-                    while (offset + 3 < msg.size() - 1) {
-                        debugString_ += ",";
+                    while (offset + 3 < msg.size()) {
                         midimsg.continueSysEx(msg.byte(offset), msg.byte(offset + 1), msg.byte(offset + 2));
                         midiOutput_.sendMessage(midimsg);
                         offset += 3;
@@ -300,23 +265,15 @@ bool MMMidiDevice::send(const EraeApi::MidiMsg& msg) {
 
                     payloadSz = msg.size() - offset - 1;  // F7
                     if (payloadSz == 0) {
-                        debugString_ += "E5";
                         midimsg.endSysEx();
                         midiOutput_.sendMessage(midimsg);
                     } else if (payloadSz == 1) {
-                        debugString_ += "E6";
                         midimsg.endSysEx(msg.byte(offset));
                         midiOutput_.sendMessage(midimsg);
                     } else if (payloadSz == 2) {
-                        debugString_ += "E7";
                         midimsg.endSysEx(msg.byte(offset), msg.byte(offset + 1));
                         midiOutput_.sendMessage(midimsg);
                     }
-                    // show size and key bytes
-                    debugString_ += ">";
-                    debugString_ += std::to_string(msg.size());
-                    debugString_ += ".";
-                    debugString_ += std::to_string(msg.byte(1) & 0xFF);
                 }
             }
             // malformed, need start and end...
@@ -328,7 +285,6 @@ bool MMMidiDevice::send(const EraeApi::MidiMsg& msg) {
     }
     return true;
 }
-
 // EraeApi::MidiMsg can be 'anysize' i.e. a long sysex is one message, so will need to be broken down for MM
 // and in 'reverse' the sysex will need to be built into one message
 

@@ -73,11 +73,11 @@ struct EraeTouch : Module {
                     midiInput.setDeviceId(eraeInputDeviceId);
                     midiInput.setChannel(-1);  // all channels
                 }
-                if (eraeOutputDeviceId >= 0) {
-                    printf("Found Erae Output\n");
-                    midiOutput.setDriverId(coreMidiId);
-                    midiOutput.setDeviceId(eraeOutputDeviceId);
-                }
+                // if (eraeOutputDeviceId >= 0) {
+                //     printf("Found Erae Output\n");
+                //     midiOutput.setDriverId(coreMidiId);
+                //     midiOutput.setDeviceId(eraeOutputDeviceId);
+                // }
             }
 
 
@@ -91,12 +91,6 @@ struct EraeTouch : Module {
 
             api_->start();
 
-            api_->enableApi();
-
-            unsigned zone = 0;
-
-            api_->requestZoneBoundary(zone);
-            api_->clearZone(zone);
             // unsigned x = 5, y = 5, w = 20, h = 10;
             // unsigned rgb = 0xFFFFFF;
             // api_->drawPixel(zone, x, y, rgb);
@@ -119,9 +113,19 @@ struct EraeTouch : Module {
         while (midiInput.tryPop(&msg, args.frame)) { processMidi(msg); }
 
         if (api_ != nullptr) { api_->process(); }
-#ifdef METAMODULE
-        if (device_->debugState()) ledCounter_ = 96000;
-#endif
+
+        if(!initDone_) {
+            if(initTimer_==0) {
+                api_->enableApi();
+                initTimer_ = INIT_TIMER;
+                initCount_++;
+                debugString_="TX enableApi" + std::to_string(initCount_);
+                requestVersion();
+            } else if(initTimer_== INIT_TIMER / 2) {
+                // requestVersion();
+            }
+            initTimer_ -= initTimer_ > 0;
+        }
 
         outputs[OUT_X_OUTPUT].setChannels(MAX_TOUCH);
         outputs[OUT_Y_OUTPUT].setChannels(MAX_TOUCH);
@@ -142,6 +146,21 @@ struct EraeTouch : Module {
 
     void processMidi(const midi::Message& msg);
 
+    void requestVersion() {
+        debugString_="TX requestVersion" + std::to_string(initCount_);
+        if(api_) api_->requestVersion();
+    }
+
+    void clearZone() {
+        debugString_="TX clearZone" + std::to_string(initCount_);
+        if(api_) api_->clearZone(zone_);
+    }
+
+    void requestZoneBoundary() {
+        debugString_="TX requestZoneBoundary" + std::to_string(initCount_);
+        if(api_) api_->requestZoneBoundary(zone_);
+    }
+
 
     class ApiCallback;
     friend class ApiCallback;
@@ -149,7 +168,15 @@ struct EraeTouch : Module {
     EraeApi::EraeApi* api_ = nullptr;
     int ledCounter_ = 0;
     midi::InputQueue midiInput;
-    midi::Output midiOutput;
+
+    std::string debugString_ = "";
+
+    static constexpr int INIT_TIMER = 1000;
+    int initTimer_ = INIT_TIMER;
+    bool initDone_ = false;
+    int initCount_ = 0;
+    int zone_ = 0;
+
 
 #ifdef METAMODULE
     std::shared_ptr<MMMidiDevice> device_;
@@ -165,7 +192,12 @@ struct EraeTouch : Module {
         float touch_ = 0.0f;
     };
 
-    static constexpr unsigned MAX_TOUCH = 16;
+#ifdef METAMODULE
+    static constexpr unsigned MAX_TOUCH = 1;
+#else
+    static constexpr unsigned MAX_TOUCH = rack::engine::PORT_MAX_CHANNELS;
+#endif
+
     static constexpr unsigned MAX_ZONE = 1;
     static constexpr float MAX_V = 10.f;
     struct Zone {
@@ -187,7 +219,7 @@ struct EraeTouch : Module {
 
         // api
         void onStartTouch(unsigned zone, unsigned finger, float x, float y, float z) override {
-            // module_->ledCounter_=96000;
+            module_->ledCounter_ = 96000;
             unsigned touch = finger % MAX_TOUCH;
             // LOG_0("onStartTouch zone: " << zone << " touch " << touch << " " << x << " , " << y << " , " << z);
             if (zone < MAX_ZONE) {
@@ -222,6 +254,7 @@ struct EraeTouch : Module {
 
         void onEndTouch(unsigned zone, unsigned finger, float x, float y, float z) override {
             unsigned touch = finger % MAX_TOUCH;
+            module_->ledCounter_ = 0;
             // LOG_0("onEndTouch zone: " << zone << " touch " << touch << " " << x << " , " << y << " , " << z);
             if (zone < MAX_ZONE) {
                 auto& zoneinfo = module_->zones_[zone];
@@ -236,9 +269,16 @@ struct EraeTouch : Module {
                 }
             }
         }
+        void onVersion(unsigned version) override{
+            module_->initDone_ = true;
+            module_->debugString_="RX onVersion";
+            module_->requestZoneBoundary();
+        }
 
         void onZoneData(unsigned zone, unsigned width, unsigned height) override {
+            module_->debugString_="RX onZoneData";
             LOG_0("onZoneData zone: " << zone << " : " << width << " , " << height);
+            module_->clearZone();
             if (zone < MAX_ZONE) {
                 auto& zoneinfo = module_->zones_[zone];
                 zoneinfo.width_ = float(width);
@@ -259,7 +299,7 @@ struct EraeTouch : Module {
 #ifdef METAMODULE
     size_t get_display_text(int display_id, std::span<char> text) override {
         if (display_id == TEXT_DISPLAY) {
-            std::string someText = device_->debugString();
+            std::string someText = debugString_;
             std::string formatted;
             for (size_t i = 0; i < someText.size(); ++i) {
                 if (i > 0 && i % 16 == 0) formatted += '\n';
@@ -276,11 +316,7 @@ struct EraeTouch : Module {
 };
 
 void EraeTouch::processMidi(const midi::Message& midimsg) {
-#ifdef METAMODULE
     device_->onMessage(midimsg);
-#else
-    device_->onMessage(midimsg);
-#endif
 }
 
 
