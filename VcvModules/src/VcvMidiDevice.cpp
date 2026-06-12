@@ -20,7 +20,7 @@ static void logData(std::ostringstream& oss, const unsigned char* data, unsigned
 static std::string logMsg(const EraeApi::MidiMsg& msg) {
     std::ostringstream oss;
     oss << "sz " << std::dec << msg.size() << " data ";
-    logData(oss,msg.data(),msg.size());
+    logData(oss, msg.data(), msg.size());
     return oss.str();
 }
 
@@ -48,7 +48,7 @@ VcvMidiDevice::VcvMidiDevice(unsigned inQueueSizeE, unsigned outQueueSize) {
         std::vector<int> outdevices = driver->getOutputDeviceIds();
         for (int dev : outdevices) {
             std::string name = driver->getOutputDeviceName(dev);
-            printf("Out Device %d = %s\n", dev, name.c_str());
+            // printf("Out Device %d = %s\n", dev, name.c_str());
             if (name == "Erae 2 MIDI") eraeOutputDeviceId = dev;  // 2 for me
         }
 
@@ -108,8 +108,7 @@ bool VcvMidiDevice::nextInMsg(EraeApi::MidiMsg& msg) {
     // which it then will send to the callback handler, and interpret accordingly
     if (inputQueue_.empty()) return false;
     msg = inputQueue_.shift();
-    // LOG_0("VcvMidiDevice :: nextInMsg  sz" << msg.size());
-    LOG_0("VcvMidiDevice :: nextInMsg" << logMsg(msg));
+    // LOG_0("VcvMidiDevice :: nextInMsg" << logMsg(msg));
     return true;
 }
 bool VcvMidiDevice::nextOutMsg(EraeApi::MidiMsg& msg) {
@@ -130,7 +129,7 @@ bool VcvMidiDevice::isOutputOpen() {
 bool VcvMidiDevice::send(const EraeApi::MidiMsg& msg) {
     if (!isOutputOpen()) return false;
 
-    LOG_0("VcvMidiDevice :: send " << logMsg(msg));
+    // LOG_0("VcvMidiDevice :: send " << logMsg(msg));
     rack::midi::Message midimsg;
     midimsg.bytes.resize(msg.size());
     for (unsigned i = 0; i < msg.size(); i++) { midimsg.bytes[i] = msg.byte(i); }

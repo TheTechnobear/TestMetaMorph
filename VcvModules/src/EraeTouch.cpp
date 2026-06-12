@@ -40,9 +40,7 @@ struct EraeTouch : Module {
             midiInput.setChannel(-1);
             device_ = std::make_shared<MMMidiDevice>();
 #else
-            int coreMidiId = -1;          // 1 = coremidi on my system
-            int eraeInputDeviceId = -1;   // 2 on mine
-            int eraeOutputDeviceId = -1;  // 2 on mine
+            int coreMidiId = -1;  // 1 = coremidi on my system
             std::vector<int> driverIds = rack::midi::getDriverIds();
             for (int id : driverIds) {
                 auto* driver = rack::midi::getDriver(id);
@@ -53,18 +51,13 @@ struct EraeTouch : Module {
             }
             if (coreMidiId >= 0) {
                 auto* driver = rack::midi::getDriver(coreMidiId);
+
+                int eraeInputDeviceId = -1;  // 2 on mine
                 std::vector<int> indevices = driver->getInputDeviceIds();
                 for (int dev : indevices) {
                     std::string name = driver->getInputDeviceName(dev);
                     // printf("In Device %d = %s\n", dev, name.c_str());
                     if (name == "Erae 2 MIDI") eraeInputDeviceId = dev;  // 2 for me
-                }
-
-                std::vector<int> outdevices = driver->getOutputDeviceIds();
-                for (int dev : outdevices) {
-                    std::string name = driver->getOutputDeviceName(dev);
-                    // printf("Out Device %d = %s\n", dev, name.c_str());
-                    if (name == "Erae 2 MIDI") eraeOutputDeviceId = dev;  // 2 for me
                 }
 
                 if (eraeInputDeviceId >= 0) {
@@ -73,7 +66,14 @@ struct EraeTouch : Module {
                     midiInput.setDeviceId(eraeInputDeviceId);
                     midiInput.setChannel(-1);  // all channels
                 }
-                // if (eraeOutputDeviceId >= 0) {
+                // int eraeOutputDeviceId = -1;  // 2 on mine
+                // std::vector<int> outdevices = driver->getOutputDeviceIds();
+                // for (int dev : outdevices) {
+                //     std::string name = driver->getOutputDeviceName(dev);
+                //     // printf("Out Device %d = %s\n", dev, name.c_str());
+                //     if (name == "Erae 2 MIDI") eraeOutputDeviceId = dev;  // 2 for me
+                // }
+                // // if (eraeOutputDeviceId >= 0) {
                 //     printf("Found Erae Output\n");
                 //     midiOutput.setDriverId(coreMidiId);
                 //     midiOutput.setDeviceId(eraeOutputDeviceId);
@@ -114,15 +114,12 @@ struct EraeTouch : Module {
 
         if (api_ != nullptr) { api_->process(); }
 
-        if(!initDone_) {
-            if(initTimer_==0) {
+        if (!initDone_) {
+            if (initTimer_ == 0) {
                 api_->enableApi();
                 initTimer_ = INIT_TIMER;
                 initCount_++;
-                debugString_="TX enableApi" + std::to_string(initCount_);
                 requestVersion();
-            } else if(initTimer_== INIT_TIMER / 2) {
-                // requestVersion();
             }
             initTimer_ -= initTimer_ > 0;
         }
@@ -147,18 +144,15 @@ struct EraeTouch : Module {
     void processMidi(const midi::Message& msg);
 
     void requestVersion() {
-        debugString_="TX requestVersion" + std::to_string(initCount_);
-        if(api_) api_->requestVersion();
+        if (api_) api_->requestVersion();
     }
 
     void clearZone() {
-        debugString_="TX clearZone" + std::to_string(initCount_);
-        if(api_) api_->clearZone(zone_);
+        if (api_) api_->clearZone(zone_);
     }
 
     void requestZoneBoundary() {
-        debugString_="TX requestZoneBoundary" + std::to_string(initCount_);
-        if(api_) api_->requestZoneBoundary(zone_);
+        if (api_) api_->requestZoneBoundary(zone_);
     }
 
 
@@ -169,10 +163,8 @@ struct EraeTouch : Module {
     int ledCounter_ = 0;
     midi::InputQueue midiInput;
 
-    std::string debugString_ = "";
-
     static constexpr int INIT_TIMER = 1000;
-    int initTimer_ = INIT_TIMER;
+    int initTimer_ = 0;
     bool initDone_ = false;
     int initCount_ = 0;
     int zone_ = 0;
@@ -192,11 +184,7 @@ struct EraeTouch : Module {
         float touch_ = 0.0f;
     };
 
-#ifdef METAMODULE
-    static constexpr unsigned MAX_TOUCH = 1;
-#else
     static constexpr unsigned MAX_TOUCH = rack::engine::PORT_MAX_CHANNELS;
-#endif
 
     static constexpr unsigned MAX_ZONE = 1;
     static constexpr float MAX_V = 10.f;
@@ -219,9 +207,9 @@ struct EraeTouch : Module {
 
         // api
         void onStartTouch(unsigned zone, unsigned finger, float x, float y, float z) override {
-            module_->ledCounter_ = 96000;
             unsigned touch = finger % MAX_TOUCH;
             // LOG_0("onStartTouch zone: " << zone << " touch " << touch << " " << x << " , " << y << " , " << z);
+            module_->ledCounter_ = 96000;
             if (zone < MAX_ZONE) {
                 auto& zoneinfo = module_->zones_[zone];
                 if (touch < MAX_TOUCH) {
@@ -269,14 +257,12 @@ struct EraeTouch : Module {
                 }
             }
         }
-        void onVersion(unsigned version) override{
+        void onVersion(unsigned version) override {
             module_->initDone_ = true;
-            module_->debugString_="RX onVersion";
             module_->requestZoneBoundary();
         }
 
         void onZoneData(unsigned zone, unsigned width, unsigned height) override {
-            module_->debugString_="RX onZoneData";
             LOG_0("onZoneData zone: " << zone << " : " << width << " , " << height);
             module_->clearZone();
             if (zone < MAX_ZONE) {
@@ -298,18 +284,18 @@ struct EraeTouch : Module {
 
 #ifdef METAMODULE
     size_t get_display_text(int display_id, std::span<char> text) override {
-        if (display_id == TEXT_DISPLAY) {
-            std::string someText = debugString_;
-            std::string formatted;
-            for (size_t i = 0; i < someText.size(); ++i) {
-                if (i > 0 && i % 16 == 0) formatted += '\n';
-                formatted += someText[i];
-            }
+        // if (display_id == TEXT_DISPLAY) {
+        //     std::string someText = textToDisplay_;
+        //     std::string formatted;
+        //     for (size_t i = 0; i < someText.size(); ++i) {
+        //         if (i > 0 && i % 16 == 0) formatted += '\n';
+        //         formatted += someText[i];
+        //     }
 
-            size_t chars_to_copy = std::min(formatted.size(), text.size());
-            std::copy(formatted.data(), formatted.data() + chars_to_copy, text.begin());
-            return chars_to_copy;
-        }
+        //     size_t chars_to_copy = std::min(formatted.size(), text.size());
+        //     std::copy(formatted.data(), formatted.data() + chars_to_copy, text.begin());
+        //     return chars_to_copy;
+        // }
         return 0;
     }
 #endif
